@@ -5,16 +5,16 @@ import MobileNavbar from "./components/MobileNavbar";
 
 export const metadata: Metadata = {
   title: {
-    default: "JSMR Access",
-    template: "%s | JSMR Access",
+    default: "JMSR Access",
+    template: "%s | JMSR Access",
   },
   description:
     "Sistema de control de acceso QR para el Fraccionamiento José María Sánchez Ramírez.",
-  applicationName: "JSMR Access",
+  applicationName: "JMSR Access",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "JSMR Access",
+    title: "JMSR Access",
     statusBarStyle: "black-translucent",
   },
   formatDetection: {
