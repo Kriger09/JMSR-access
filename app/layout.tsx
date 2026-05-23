@@ -22,15 +22,11 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/icon-192.png", sizes: "192x102", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x272", type: "image/png" },
       { url: "/icon-192_2.png", sizes: "192x192", type: "image/png" },
       { url: "/icon-512_2.png", sizes: "512x512", type: "image/png" },
     ],
-    shortcut: "/icon-192.png",
+    shortcut: "/icon-192_2.png",
     apple: [
-      { url: "/icon-192.png", sizes: "192x102", type: "image/png" },
-      { url: "/icon-512.png", sizes: "512x272", type: "image/png" },
       { url: "/icon-192_2.png", sizes: "192x192", type: "image/png" },
       { url: "/icon-512_2.png", sizes: "512x512", type: "image/png" },
     ],
@@ -51,8 +47,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es">
-      <body>
+    <html lang="es" className="bg-black">
+      <body className="bg-black text-white">
         {children}
         <InstallPWA />
         <MobileNavbar />
