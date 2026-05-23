@@ -58,7 +58,7 @@ export default function InstallPWA() {
       onClick={installApp}
       className="fixed bottom-5 left-1/2 -translate-x-1/2 z-[9999] bg-orange-600 hover:bg-orange-500 active:scale-95 transition-all duration-200 shadow-2xl border border-orange-400 rounded-full px-6 py-4 text-white font-black text-sm md:text-base backdrop-blur-xl"
     >
-      📲 Instalar JSMR Access
+      📲 Instalar JMSR Access
     </button>
   );
 }

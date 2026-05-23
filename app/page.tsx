@@ -16,13 +16,13 @@ export default function Home() {
           </div>
 
           <div className="mt-10 flex justify-center">
-            <div className="relative">
-              <div className="absolute inset-0 rounded-[2rem] bg-orange-500 blur-2xl opacity-30" />
-              <div className="relative w-28 h-28 md:w-32 md:h-32 rounded-[2rem] bg-gradient-to-br from-orange-500 via-orange-700 to-red-950 flex items-center justify-center shadow-2xl border border-orange-300/20">
-                <span className="text-3xl md:text-4xl font-black tracking-tight">
-                  JSMR
-                </span>
-              </div>
+            <div className="relative w-32 h-32 md:w-40 md:h-40 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-orange-500/20 blur-3xl" />
+              <img
+                src="./icon-192.png"
+                alt="JMSR Access"
+                className="relative w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,115,0,0.35)]"
+              />
             </div>
           </div>
 
@@ -31,7 +31,7 @@ export default function Home() {
           </p>
 
           <h1 className="mt-5 text-5xl md:text-7xl lg:text-8xl font-black tracking-tight">
-            JSMR Access
+            JMSR Access
           </h1>
 
           <p className="mt-6 text-neutral-300 text-lg md:text-xl max-w-2xl mx-auto leading-relaxed">

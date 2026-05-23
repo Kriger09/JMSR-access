@@ -116,7 +116,7 @@ export default function ResidentePage() {
     context.fillStyle = "#111111";
     context.font = "bold 42px Arial";
     context.textAlign = "center";
-    context.fillText("JSMR Access", canvas.width / 2, 165);
+    context.fillText("JMSR Access", canvas.width / 2, 165);
 
     context.font = "bold 34px Arial";
     context.fillText("Código QR de visitante", canvas.width / 2, 225);
@@ -176,7 +176,7 @@ export default function ResidentePage() {
     );
 
     const shareData = {
-      title: "Código QR de visitante - JSMR Access",
+      title: "Código QR de visitante - JMSR Access",
       text: `QR de acceso para ${generatedVisit.visitorName}, casa ${generatedVisit.houseNumber}.`,
       files: [file],
     };
