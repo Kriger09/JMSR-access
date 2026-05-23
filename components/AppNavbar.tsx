@@ -29,7 +29,7 @@ export default function AppNavbar({ title, role }: AppNavbarProps) {
     <header className="bg-neutral-900 border border-neutral-800 rounded-3xl px-6 py-5 flex flex-col md:flex-row md:items-center md:justify-between gap-5 mb-8">
       <div>
         <p className="text-orange-400 font-semibold tracking-[0.3em] uppercase text-sm">
-          JSMR Access
+          JMSR Access
         </p>
 
         <h1 className="text-3xl md:text-4xl font-black mt-2">{title}</h1>
