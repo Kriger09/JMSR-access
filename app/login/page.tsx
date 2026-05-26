@@ -111,10 +111,14 @@ export default function LoginPage() {
               <div className="absolute inset-x-8 -top-px h-px bg-gradient-to-r from-transparent via-orange-400/70 to-transparent" />
 
               <div className="flex justify-center lg:hidden mb-6">
-                <div className="relative w-24 h-24 rounded-[1.75rem] bg-gradient-to-br from-orange-500 via-orange-700 to-red-950 flex items-center justify-center shadow-2xl border border-orange-300/20">
-                  <div className="absolute inset-0 rounded-[1.75rem] bg-orange-500 blur-2xl opacity-30" />
-                  <span className="relative text-3xl font-black tracking-tight">JSMR</span>
-                </div>
+              <div className="relative w-32 h-32 md:w-40 md:h-40 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-orange-500/20 blur-3xl" />
+              <img
+                src="./icon-192.png"
+                alt="JMSR Access"
+                className="relative w-full h-full object-contain drop-shadow-[0_0_25px_rgba(255,115,0,0.35)]"
+              />
+            </div>
               </div>
 
               <p className="text-orange-400 font-semibold tracking-[0.3em] uppercase text-xs">
