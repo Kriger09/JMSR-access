@@ -12,11 +12,23 @@ export default function AdminPage() {
   const [visits, setVisits] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
+  const [devices, setDevices] = useState<any[]>([]);
   const [houseSearch, setHouseSearch] = useState("");
   const [visitSearch, setVisitSearch] = useState("");
+
   const [editingProfileId, setEditingProfileId] = useState<string | null>(null);
+  const [editingProfileFullName, setEditingProfileFullName] = useState("");
   const [editingProfileRole, setEditingProfileRole] = useState("");
   const [editingProfileHouseId, setEditingProfileHouseId] = useState("");
+
+  const [newUserFullName, setNewUserFullName] = useState("");
+  const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
+  const [newUserRole, setNewUserRole] = useState("resident");
+  const [newUserHouseId, setNewUserHouseId] = useState("");
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [createUserMessage, setCreateUserMessage] = useState("");
+  const [resetPasswordValue, setResetPasswordValue] = useState("");
 
   const [houseNumber, setHouseNumber] = useState("");
   const [residentName, setResidentName] = useState("");
@@ -43,13 +55,17 @@ export default function AdminPage() {
 
     const { data: profilesData } = await supabase
       .from("profiles")
-      .select("id, email, role, house_id")
+      .select("id, email, full_name, role, house_id")
       .order("email", { ascending: true });
+
+    const devicesResponse = await fetch("/api/admin/devices");
+    const devicesResult = devicesResponse.ok ? await devicesResponse.json() : { devices: [] };
 
     setHouses(housesData ?? []);
     setVisits(visitsData ?? []);
     setLogs(logsData ?? []);
     setProfiles(profilesData ?? []);
+    setDevices(devicesResult.devices ?? []);
   };
 
   const addHouse = async () => {
@@ -135,6 +151,7 @@ export default function AdminPage() {
 
   const startEditingProfile = (profile: any) => {
     setEditingProfileId(profile.id);
+    setEditingProfileFullName(profile.full_name ?? "");
     setEditingProfileRole(profile.role ?? "resident");
     setEditingProfileHouseId(profile.house_id ?? "");
   };
@@ -152,6 +169,7 @@ export default function AdminPage() {
     const { error } = await supabase
       .from("profiles")
       .update({
+        full_name: editingProfileFullName.trim() || null,
         role: editingProfileRole,
         house_id: nextHouseId,
       })
@@ -163,10 +181,154 @@ export default function AdminPage() {
     }
 
     setEditingProfileId(null);
+    setEditingProfileFullName("");
     setEditingProfileRole("");
     setEditingProfileHouseId("");
 
     loadData();
+  };
+
+  const deleteUser = async (profile: any) => {
+    const confirmed = window.confirm(
+      `¿Seguro que deseas eliminar al usuario ${profile.email}? Esta acción eliminará su acceso al sistema.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch("/api/admin/delete-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: profile.id,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || "No se pudo eliminar el usuario.");
+        return;
+      }
+
+      await loadData();
+    } catch {
+      alert("Ocurrió un error al eliminar el usuario.");
+    }
+  };
+
+  const updateDeviceStatus = async (deviceId: string, nextStatus: boolean) => {
+    try {
+      const response = await fetch("/api/admin/update-device", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          device_id: deviceId,
+          is_active: nextStatus,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || "No se pudo actualizar el dispositivo.");
+        return;
+      }
+
+      await loadData();
+    } catch {
+      alert("Ocurrió un error al actualizar el dispositivo.");
+    }
+  };
+
+  const resetUserPassword = async (profile: any) => {
+    const password = window.prompt(
+      `Nueva contraseña para ${profile.email}`,
+      resetPasswordValue || ""
+    );
+
+    if (!password) return;
+
+    try {
+      const response = await fetch("/api/admin/reset-password", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          user_id: profile.id,
+          password,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || "No se pudo actualizar la contraseña.");
+        return;
+      }
+
+      setResetPasswordValue(password);
+      alert("Contraseña actualizada correctamente.");
+    } catch {
+      alert("Ocurrió un error al actualizar la contraseña.");
+    }
+  };
+
+  const createUser = async () => {
+    setCreateUserMessage("");
+
+    if (!newUserFullName.trim() || !newUserEmail.trim() || !newUserPassword.trim() || !newUserRole) {
+      setCreateUserMessage("Completa nombre, correo, contraseña y rol.");
+      return;
+    }
+
+    if (newUserRole === "resident" && !newUserHouseId) {
+      setCreateUserMessage("Selecciona una casa para el usuario residente.");
+      return;
+    }
+
+    try {
+      setIsCreatingUser(true);
+
+      const response = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          full_name: newUserFullName.trim(),
+          email: newUserEmail.trim(),
+          password: newUserPassword,
+          role: newUserRole,
+          house_id: newUserRole === "resident" ? newUserHouseId : null,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setCreateUserMessage(result.error || "No se pudo crear el usuario.");
+        return;
+      }
+
+      setNewUserFullName("");
+      setNewUserEmail("");
+      setNewUserPassword("");
+      setNewUserRole("resident");
+      setNewUserHouseId("");
+      setCreateUserMessage("Usuario creado correctamente.");
+
+      await loadData();
+    } catch {
+      setCreateUserMessage("Ocurrió un error al crear el usuario.");
+    } finally {
+      setIsCreatingUser(false);
+    }
   };
 
   const cancelVisit = async (visitId: string) => {
@@ -277,6 +439,8 @@ export default function AdminPage() {
   }).length;
 
   const totalAccessLogsCount = logs.length;
+  const activeDevicesCount = devices.filter((device) => device.is_active).length;
+  const inactiveDevicesCount = devices.filter((device) => !device.is_active).length;
 
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
@@ -399,6 +563,26 @@ export default function AdminPage() {
               Escaneos guardados en caseta.
             </p>
           </div>
+
+          <div className="group relative overflow-hidden bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-xl hover:border-orange-500/40 transition-all md:col-span-4">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              <div>
+                <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
+                  Dispositivos residentes
+                </p>
+                <p className="text-4xl font-black mt-3 text-purple-300">
+                  {devices.length}
+                </p>
+                <p className="text-neutral-500 text-sm mt-2">
+                  {activeDevicesCount} activos · {inactiveDevicesCount} inactivos.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-purple-700 bg-purple-950 px-5 py-4 text-purple-200 font-black">
+                Máximo 3 activos por casa
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 md:p-5">
@@ -494,6 +678,86 @@ export default function AdminPage() {
           </button>
         </div>
 
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-5">
+          <div>
+            <p className="text-orange-400 font-semibold tracking-[0.25em] uppercase text-sm">
+              Usuarios
+            </p>
+            <h2 className="text-xl font-bold mt-1">Crear usuario</h2>
+            <p className="text-neutral-400 text-sm mt-1">
+              Crea usuarios en Supabase Auth, asigna rol y vincula casa cuando sea residente.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <input
+              placeholder="Nombre completo"
+              value={newUserFullName}
+              onChange={(e) => setNewUserFullName(e.target.value)}
+              className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 outline-none focus:border-orange-500"
+            />
+
+            <input
+              type="email"
+              placeholder="Correo electrónico"
+              value={newUserEmail}
+              onChange={(e) => setNewUserEmail(e.target.value)}
+              className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 outline-none focus:border-orange-500"
+            />
+
+            <input
+              type="password"
+              placeholder="Contraseña"
+              value={newUserPassword}
+              onChange={(e) => setNewUserPassword(e.target.value)}
+              className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 outline-none focus:border-orange-500"
+            />
+
+            <select
+              value={newUserRole}
+              onChange={(e) => {
+                setNewUserRole(e.target.value);
+                if (e.target.value !== "resident") {
+                  setNewUserHouseId("");
+                }
+              }}
+              className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 outline-none focus:border-orange-500"
+            >
+              <option value="resident">resident</option>
+              <option value="caseta">caseta</option>
+              <option value="admin">admin</option>
+            </select>
+
+            <select
+              value={newUserHouseId}
+              onChange={(e) => setNewUserHouseId(e.target.value)}
+              disabled={newUserRole !== "resident"}
+              className="w-full md:col-span-2 bg-neutral-800 border border-neutral-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl px-4 py-3 outline-none focus:border-orange-500"
+            >
+              <option value="">Seleccionar casa para residente</option>
+              {houses.map((house) => (
+                <option key={house.id} value={house.id}>
+                  {house.house_number} — {house.resident_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {createUserMessage && (
+            <div className="rounded-xl border border-neutral-700 bg-neutral-800 px-4 py-3 text-sm font-semibold text-neutral-200">
+              {createUserMessage}
+            </div>
+          )}
+
+          <button
+            onClick={createUser}
+            disabled={isCreatingUser}
+            className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl py-3 font-black transition-all"
+          >
+            {isCreatingUser ? "Creando usuario..." : "Crear usuario"}
+          </button>
+        </div>
+
         <div className="bg-neutral-900 rounded-2xl p-5">
           <div className="mb-6">
             <p className="text-orange-400 font-semibold tracking-[0.25em] uppercase text-sm">
@@ -517,7 +781,25 @@ export default function AdminPage() {
 
                 return (
                   <div key={profile.id} className="bg-neutral-800 rounded-xl p-4 space-y-3">
-                    <div className="grid md:grid-cols-3 gap-4">
+                    <div className="grid md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
+                          Nombre
+                        </p>
+                        {isEditing ? (
+                          <input
+                            value={editingProfileFullName}
+                            onChange={(e) => setEditingProfileFullName(e.target.value)}
+                            placeholder="Nombre completo"
+                            className="w-full mt-2 bg-neutral-900 border border-neutral-700 rounded-2xl px-4 py-3 outline-none focus:border-orange-500"
+                          />
+                        ) : (
+                          <p className="font-bold mt-1">
+                            {profile.full_name ?? "Sin nombre"}
+                          </p>
+                        )}
+                      </div>
+
                       <div>
                         <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
                           Usuario
@@ -576,7 +858,7 @@ export default function AdminPage() {
                       </div>
                     </div>
 
-                    <div className="grid md:grid-cols-2 gap-3">
+                    <div className="grid md:grid-cols-3 gap-3">
                       {isEditing ? (
                         <>
                           <button
@@ -589,6 +871,7 @@ export default function AdminPage() {
                           <button
                             onClick={() => {
                               setEditingProfileId(null);
+                              setEditingProfileFullName("");
                               setEditingProfileRole("");
                               setEditingProfileHouseId("");
                             }}
@@ -598,14 +881,138 @@ export default function AdminPage() {
                           </button>
                         </>
                       ) : (
-                        <button
-                          onClick={() => startEditingProfile(profile)}
-                          className="md:col-span-2 w-full bg-orange-700 hover:bg-orange-600 rounded-2xl py-3 font-bold transition-all"
-                        >
-                          Editar usuario
-                        </button>
+                        <>
+                          <button
+                            onClick={() => startEditingProfile(profile)}
+                            className="w-full bg-orange-700 hover:bg-orange-600 rounded-2xl py-3 font-bold transition-all"
+                          >
+                            Editar usuario
+                          </button>
+
+                          <button
+                            onClick={() => deleteUser(profile)}
+                            className="w-full bg-red-900 hover:bg-red-800 rounded-2xl py-3 font-bold transition-all"
+                          >
+                            Eliminar usuario
+                          </button>
+                          <button
+                            onClick={() => resetUserPassword(profile)}
+                            className="w-full bg-blue-900 hover:bg-blue-800 rounded-2xl py-3 font-bold transition-all"
+                          >
+                            Restablecer contraseña
+                          </button>
+                        </>
                       )}
                     </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
+            <div>
+              <p className="text-orange-400 font-semibold tracking-[0.25em] uppercase text-sm">
+                Seguridad
+              </p>
+              <h2 className="text-xl font-bold mt-1">Dispositivos autorizados</h2>
+              <p className="text-neutral-400 text-sm mt-1">
+                Administra los dispositivos vinculados a residentes. Puedes desactivar un equipo para liberar espacio dentro del límite de 3 dispositivos por casa.
+              </p>
+            </div>
+
+            <div className="bg-neutral-800 border border-neutral-700 rounded-2xl px-5 py-4 text-center">
+              <p className="text-sm text-neutral-400 font-semibold uppercase tracking-[0.2em]">
+                Activos
+              </p>
+              <p className="text-3xl font-black text-green-400 mt-1">
+                {activeDevicesCount}
+              </p>
+            </div>
+          </div>
+
+          {devices.length === 0 ? (
+            <div className="bg-neutral-800 rounded-2xl p-6 text-neutral-400 text-center">
+              Todavía no hay dispositivos registrados.
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {devices.map((device) => {
+                const house = Array.isArray(device.houses) ? device.houses[0] : device.houses;
+                const profile = Array.isArray(device.profiles) ? device.profiles[0] : device.profiles;
+
+                return (
+                  <div key={device.id} className="bg-neutral-800 rounded-xl p-4 space-y-4 border border-neutral-700">
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                      <div>
+                        <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
+                          Casa
+                        </p>
+                        <p className="font-black mt-1 text-white">
+                          {house?.house_number ?? "Sin casa"}
+                        </p>
+                        <p className="text-neutral-400 text-sm mt-1">
+                          {house?.resident_name ?? "Sin residente"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
+                          Usuario
+                        </p>
+                        <p className="font-bold mt-1 break-all">
+                          {profile?.full_name ?? "Sin nombre"}
+                        </p>
+                        <p className="text-neutral-400 text-sm break-all">
+                          {profile?.email ?? "Sin correo"}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
+                          Dispositivo
+                        </p>
+                        <p className="font-bold mt-1 text-neutral-200 line-clamp-2">
+                          {device.device_name ?? "Dispositivo sin nombre"}
+                        </p>
+                        <p className="text-neutral-500 text-xs mt-1 break-all">
+                          {device.device_id}
+                        </p>
+                      </div>
+
+                      <div>
+                        <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
+                          Último uso
+                        </p>
+                        <p className="font-bold mt-1">
+                          {device.last_seen_at
+                            ? new Date(device.last_seen_at).toLocaleString()
+                            : "Sin registro"}
+                        </p>
+                        <span
+                          className={
+                            device.is_active
+                              ? "inline-flex mt-2 rounded-full border border-green-700 bg-green-950 px-4 py-2 text-sm font-black text-green-300"
+                              : "inline-flex mt-2 rounded-full border border-red-700 bg-red-950 px-4 py-2 text-sm font-black text-red-300"
+                          }
+                        >
+                          {device.is_active ? "Activo" : "Inactivo"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => updateDeviceStatus(device.id, !device.is_active)}
+                      className={
+                        device.is_active
+                          ? "w-full bg-red-900 hover:bg-red-800 rounded-2xl py-3 font-bold transition-all"
+                          : "w-full bg-green-800 hover:bg-green-700 rounded-2xl py-3 font-bold transition-all"
+                      }
+                    >
+                      {device.is_active ? "Desactivar dispositivo" : "Reactivar dispositivo"}
+                    </button>
                   </div>
                 );
               })}

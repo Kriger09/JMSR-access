@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
-import InstallPWA from "./components/InstallPWA";
 import MobileNavbar from "./components/MobileNavbar";
 
 export const metadata: Metadata = {
@@ -50,7 +49,6 @@ export default function RootLayout({
     <html lang="es" className="bg-black">
       <body className="bg-black text-white">
         {children}
-        <InstallPWA />
         <MobileNavbar />
       </body>
     </html>
