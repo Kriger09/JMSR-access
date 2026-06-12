@@ -69,7 +69,7 @@ export default function LoginPage() {
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white px-4 py-6 overflow-hidden">
-      <section className="relative max-w-6xl mx-auto min-h-[calc(100vh-3rem)] flex items-center justify-center">
+      <section className="relative max-w-6xl mx-auto flex items-center justify-center">
         <div className="absolute inset-0 -z-10">
           <div className="absolute top-10 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full bg-orange-600/20 blur-3xl" />
           <div className="absolute bottom-10 right-10 h-64 w-64 rounded-full bg-red-900/20 blur-3xl" />
@@ -98,11 +98,11 @@ export default function LoginPage() {
             </p>
 
             <h1 className="mt-5 text-6xl font-black tracking-tight leading-none">
-              Control de acceso inteligente
+              Control seguro de accesos residenciales
             </h1>
 
             <p className="mt-6 text-neutral-300 text-lg max-w-xl leading-relaxed">
-              Ingresa al sistema para gestionar accesos, validar códigos QR y supervisar la operación del fraccionamiento.
+              Plataforma digital para administrar accesos, validar códigos QR, gestionar visitas y fortalecer la seguridad del fraccionamiento.
             </p>
           </div>
 
@@ -125,6 +125,10 @@ export default function LoginPage() {
                 JMSR Access
               </p>
 
+              <div className="mt-2 inline-flex rounded-full border border-orange-500/30 bg-orange-500/10 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.2em] text-orange-300">
+                Versión 1.0
+              </div>
+
               <h1 className="text-4xl md:text-5xl font-black mt-3 tracking-tight">
                 Iniciar sesión
               </h1>
@@ -132,6 +136,10 @@ export default function LoginPage() {
               <p className="text-neutral-400 mt-4 leading-relaxed text-sm md:text-base">
                 Acceso exclusivo para residentes, caseta y administración autorizada.
               </p>
+
+              <div className="mt-4 rounded-2xl border border-neutral-800 bg-neutral-800/50 p-3 text-xs text-neutral-400">
+                Todas las actividades de acceso y validación quedan registradas para fines de seguridad y control interno.
+              </div>
 
               <div className="mt-8 space-y-4">
                 <div>
@@ -192,6 +200,70 @@ export default function LoginPage() {
                 </button>
               </div>
             </section>
+          </div>
+        </div>
+      </section>
+      <section className="relative max-w-6xl mx-auto flex items-center justify-center">
+        <div className="mt-10 w-full max-w-5xl rounded-[2rem] border border-neutral-800 bg-neutral-900/80 p-6 md:p-8 shadow-2xl backdrop-blur-xl">
+          <div className="grid grid-cols-1 lg:grid-cols-[0.9fr_1.1fr] gap-8 items-start">
+            <div>
+              <p className="text-orange-400 font-semibold tracking-[0.25em] uppercase text-m">
+                Acerca de JMSR Access
+              </p>
+              <h2 className="mt-3 text-3xl md:text-4xl font-black">
+                Plataforma digital de control residencial
+              </h2>
+              <p className="mt-4 text-neutral-400 leading-relaxed text-lg">
+                JMSR Access es un sistema diseñado para fortalecer la seguridad, organización y trazabilidad del control de accesos del Fraccionamiento José María Sánchez Ramírez.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-5">
+                <p className="text-orange-400 text-lg font-black uppercase tracking-[0.2em]">
+                  QR temporales
+                </p>
+                <p className="mt-2 text-neutral-400 text-m leading-relaxed">
+                  Generación de códigos de acceso con vigencia limitada para visitantes autorizados.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-5">
+                <p className="text-orange-400 text-lg font-black uppercase tracking-[0.2em]">
+                  Caseta
+                </p>
+                <p className="mt-2 text-neutral-400 text-m leading-relaxed">
+                  Validación rápida de visitantes mediante escaneo QR y registro de entrada o rechazo.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-5">
+                <p className="text-orange-400 text-lg font-black uppercase tracking-[0.2em]">
+                  Administración
+                </p>
+                <p className="mt-2 text-neutral-400 text-m leading-relaxed">
+                  Gestión de casas, usuarios, roles, dispositivos autorizados e historial operativo.
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-5">
+                <p className="text-orange-400 text-lg font-black uppercase tracking-[0.2em]">
+                  Trazabilidad
+                </p>
+                <p className="mt-2 text-neutral-400 text-m leading-relaxed">
+                  Registro digital de actividades para consulta, control interno y seguimiento de accesos.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3 rounded-2xl border border-orange-500/20 bg-orange-500/10 px-5 py-4">
+            <p className="text-sm text-orange-100 leading-relaxed">
+              Versión 1.0 orientada a operación residencial, control de visitantes y administración segura de accesos.
+            </p>
+            <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">
+              Desarrollado por Kriger
+            </p>
           </div>
         </div>
       </section>

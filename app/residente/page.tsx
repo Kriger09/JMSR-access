@@ -51,6 +51,7 @@ export default function ResidentePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [deviceStatus, setDeviceStatus] = useState<"checking" | "authorized" | "blocked">("checking");
+  const [showWelcomeGuide, setShowWelcomeGuide] = useState(false);
   const qrWrapperRef = useRef<HTMLDivElement | null>(null);
 
   const getOrCreateDeviceId = () => {
@@ -383,6 +384,9 @@ export default function ResidentePage() {
       setResidentHouse(house as ResidentHouse);
       await loadHouseVisits(house.id);
 
+      const hasSeenWelcomeGuide = window.localStorage.getItem("jsmr_resident_welcome_seen");
+      setShowWelcomeGuide(!hasSeenWelcomeGuide);
+
       setIsCheckingSession(false);
     };
 
@@ -483,6 +487,80 @@ export default function ResidentePage() {
             Cerrar sesión
           </button>
         </div>
+      </main>
+    );
+  }
+
+  if (showWelcomeGuide) {
+    return (
+      <main className="min-h-screen bg-neutral-950 text-white px-4 py-6 flex items-center justify-center">
+        <section className="w-full max-w-3xl rounded-[2rem] border border-neutral-800 bg-neutral-900 p-6 md:p-8 shadow-2xl">
+          <div className="text-center">
+            <div className="mx-auto w-24 h-24 rounded-[1.75rem] bg-orange-500/10 border border-orange-500/30 flex items-center justify-center text-4xl font-black text-orange-300">
+              QR
+            </div>
+
+            <p className="mt-6 text-orange-400 font-semibold tracking-[0.3em] uppercase text-sm">
+              Bienvenido a JMSR Access
+            </p>
+
+            <h1 className="mt-3 text-3xl md:text-5xl font-black tracking-tight">
+              Tu acceso residencial digital
+            </h1>
+
+            <p className="mt-4 text-neutral-400 leading-relaxed max-w-2xl mx-auto">
+              Desde este panel podrás generar códigos QR temporales para tus visitantes, compartirlos y consultar el historial semanal de tu casa.
+            </p>
+          </div>
+
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-5">
+              <p className="text-orange-400 text-sm font-black uppercase tracking-[0.2em]">
+                1. Genera
+              </p>
+              <p className="mt-2 text-neutral-400 text-sm leading-relaxed">
+                Escribe el nombre del visitante y crea un QR con vigencia fija de 3 horas.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-5">
+              <p className="text-orange-400 text-sm font-black uppercase tracking-[0.2em]">
+                2. Comparte
+              </p>
+              <p className="mt-2 text-neutral-400 text-sm leading-relaxed">
+                Envía o descarga el código para que tu visitante lo presente en caseta.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-neutral-800 bg-neutral-950/70 p-5">
+              <p className="text-orange-400 text-sm font-black uppercase tracking-[0.2em]">
+                3. Consulta
+              </p>
+              <p className="mt-2 text-neutral-400 text-sm leading-relaxed">
+                Revisa tus visitas generadas y cancela códigos activos cuando sea necesario.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-yellow-700 bg-yellow-950/60 p-4 text-yellow-100">
+            <p className="font-black uppercase tracking-[0.2em] text-sm text-yellow-300">
+              Aviso importante
+            </p>
+            <p className="mt-2 text-sm leading-relaxed">
+              Al otorgar permiso de acceso al visitante, el residente acepta la responsabilidad por daños, incidentes o situaciones en las que el visitante pudiera verse involucrado dentro del fraccionamiento. El visitante deberá identificarse en caseta.
+            </p>
+          </div>
+
+          <button
+            onClick={() => {
+              window.localStorage.setItem("jsmr_resident_welcome_seen", "true");
+              setShowWelcomeGuide(false);
+            }}
+            className="mt-6 w-full bg-orange-600 hover:bg-orange-500 rounded-2xl py-4 font-black text-lg shadow-2xl shadow-orange-950/40 transition-all active:scale-95"
+          >
+            Entendido, continuar
+          </button>
+        </section>
       </main>
     );
   }

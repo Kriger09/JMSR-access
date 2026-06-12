@@ -13,6 +13,14 @@ export default function AdminPage() {
   const [logs, setLogs] = useState<any[]>([]);
   const [profiles, setProfiles] = useState<any[]>([]);
   const [devices, setDevices] = useState<any[]>([]);
+  const [settings, setSettings] = useState<any | null>(null);
+  const [settingsSystemName, setSettingsSystemName] = useState("");
+  const [settingsNeighborhoodName, setSettingsNeighborhoodName] = useState("");
+  const [settingsMaxDevices, setSettingsMaxDevices] = useState("3");
+  const [settingsMaxActiveQr, setSettingsMaxActiveQr] = useState("20");
+  const [settingsQrExpirationHours, setSettingsQrExpirationHours] = useState("3");
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
+  const [settingsMessage, setSettingsMessage] = useState("");
   const [houseSearch, setHouseSearch] = useState("");
   const [visitSearch, setVisitSearch] = useState("");
 
@@ -61,11 +69,23 @@ export default function AdminPage() {
     const devicesResponse = await fetch("/api/admin/devices");
     const devicesResult = devicesResponse.ok ? await devicesResponse.json() : { devices: [] };
 
+    const settingsResponse = await fetch("/api/admin/settings");
+    const settingsResult = settingsResponse.ok ? await settingsResponse.json() : { settings: null };
+
     setHouses(housesData ?? []);
     setVisits(visitsData ?? []);
     setLogs(logsData ?? []);
     setProfiles(profilesData ?? []);
     setDevices(devicesResult.devices ?? []);
+
+    if (settingsResult.settings) {
+      setSettings(settingsResult.settings);
+      setSettingsSystemName(settingsResult.settings.system_name ?? "");
+      setSettingsNeighborhoodName(settingsResult.settings.neighborhood_name ?? "");
+      setSettingsMaxDevices(String(settingsResult.settings.max_devices_per_house ?? 3));
+      setSettingsMaxActiveQr(String(settingsResult.settings.max_active_qr ?? 20));
+      setSettingsQrExpirationHours(String(settingsResult.settings.qr_expiration_hours ?? 3));
+    }
   };
 
   const addHouse = async () => {
@@ -97,24 +117,66 @@ export default function AdminPage() {
 
   const deleteHouse = async (houseId: string, houseNumber: string) => {
     const confirmed = window.confirm(
-      `¿Seguro que deseas eliminar ${houseNumber}? Esta acción no se puede deshacer.`
+      `¿Seguro que deseas eliminar ${houseNumber}? También se eliminarán sus visitas, accesos registrados y dispositivos vinculados. Esta acción no se puede deshacer.`
     );
 
     if (!confirmed) return;
 
-    const { error } = await supabase
+    const isAuthorized = await confirmAuthorizedPassword();
+
+    if (!isAuthorized) return;
+
+    const { error: logsError } = await supabase
+      .from("access_logs")
+      .delete()
+      .eq("house_id", houseId);
+
+    if (logsError) {
+      alert("No se pudieron eliminar los accesos relacionados con esta casa.");
+      return;
+    }
+
+    const { error: visitsError } = await supabase
+      .from("visits")
+      .delete()
+      .eq("house_id", houseId);
+
+    if (visitsError) {
+      alert("No se pudieron eliminar las visitas relacionadas con esta casa.");
+      return;
+    }
+
+    const { error: devicesError } = await supabase
+      .from("resident_devices")
+      .delete()
+      .eq("house_id", houseId);
+
+    if (devicesError) {
+      alert("No se pudieron eliminar los dispositivos relacionados con esta casa.");
+      return;
+    }
+
+    const { error: profilesError } = await supabase
+      .from("profiles")
+      .update({ house_id: null })
+      .eq("house_id", houseId);
+
+    if (profilesError) {
+      alert("No se pudo desvincular a los usuarios residentes de esta casa.");
+      return;
+    }
+
+    const { error: houseError } = await supabase
       .from("houses")
       .delete()
       .eq("id", houseId);
 
-    if (error) {
-      alert(
-        "No se pudo eliminar la casa porque puede tener visitas o accesos relacionados. Puedes desactivarla en su lugar."
-      );
+    if (houseError) {
+      alert("No se pudo eliminar la casa.");
       return;
     }
 
-    loadData();
+    await loadData();
   };
 
   const startEditingHouse = (house: any) => {
@@ -195,6 +257,10 @@ export default function AdminPage() {
 
     if (!confirmed) return;
 
+    const isAuthorized = await confirmAuthorizedPassword();
+
+    if (!isAuthorized) return;
+
     try {
       const response = await fetch("/api/admin/delete-user", {
         method: "POST",
@@ -242,6 +308,110 @@ export default function AdminPage() {
       await loadData();
     } catch {
       alert("Ocurrió un error al actualizar el dispositivo.");
+    }
+  };
+
+  const saveSettings = async () => {
+    setSettingsMessage("");
+
+    if (!settings?.id) {
+      setSettingsMessage("No se encontró la configuración del sistema.");
+      return;
+    }
+
+    if (!settingsSystemName.trim() || !settingsNeighborhoodName.trim()) {
+      setSettingsMessage("Completa el nombre del sistema y del fraccionamiento.");
+      return;
+    }
+
+    const confirmationPassword = window.prompt(
+      "Ingresa la contraseña autorizada para modificar la configuración del sistema:"
+    );
+
+    if (!confirmationPassword) {
+      setSettingsMessage("La modificación fue cancelada. Se requiere contraseña autorizada.");
+      return;
+    }
+
+    try {
+      setIsSavingSettings(true);
+
+      const response = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: settings.id,
+          system_name: settingsSystemName.trim(),
+          neighborhood_name: settingsNeighborhoodName.trim(),
+          max_devices_per_house: Number(settingsMaxDevices),
+          max_active_qr: Number(settingsMaxActiveQr),
+          qr_expiration_hours: Number(settingsQrExpirationHours),
+          confirmation_password: confirmationPassword,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setSettingsMessage(result.error || "No se pudo guardar la configuración.");
+        return;
+      }
+
+      setSettings(result.settings);
+      setSettingsMessage("Configuración guardada correctamente.");
+      await loadData();
+    } catch {
+      setSettingsMessage("Ocurrió un error al guardar la configuración.");
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
+
+  const confirmAuthorizedPassword = async () => {
+    if (!settings?.id) {
+      alert("No se encontró la configuración del sistema para validar la autorización.");
+      return false;
+    }
+
+    const confirmationPassword = window.prompt(
+      "Ingresa la contraseña autorizada para continuar:"
+    );
+
+    if (!confirmationPassword) {
+      alert("Acción cancelada. Se requiere contraseña autorizada.");
+      return false;
+    }
+
+    try {
+      const response = await fetch("/api/admin/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          id: settings.id,
+          system_name: settingsSystemName.trim(),
+          neighborhood_name: settingsNeighborhoodName.trim(),
+          max_devices_per_house: Number(settingsMaxDevices),
+          max_active_qr: Number(settingsMaxActiveQr),
+          qr_expiration_hours: Number(settingsQrExpirationHours),
+          confirmation_password: confirmationPassword,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || "Contraseña de autorización incorrecta.");
+        return false;
+      }
+
+      return true;
+    } catch {
+      alert("No se pudo validar la contraseña autorizada.");
+      return false;
     }
   };
 
@@ -481,13 +651,37 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen bg-neutral-950 text-white px-4 md:px-6 pt-6 pb-28 md:pb-6">
+      <nav className="sticky top-3 z-40 rounded-[1.5rem] border border-neutral-800 bg-neutral-950/90 backdrop-blur-2xl p-2 shadow-2xl mx-auto max-w-7xl mb-8">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar">
+            {[
+              { href: "#resumen", label: "Resumen" },
+              { href: "#analytics", label: "Analytics" },
+              { href: "#crear-casa", label: "Agregar casa" },
+              { href: "#crear-usuario", label: "Crear usuario" },
+              { href: "#usuarios", label: "Usuarios" },
+              { href: "#dispositivos", label: "Dispositivos" },
+              { href: "#casas", label: "Casas" },
+              { href: "#visitas", label: "Visitas" },
+              { href: "#historial", label: "Historial" },
+              { href: "#configuracion", label: "Configuración" },
+            ].map((item) => (
+              <a
+                key={item.href}
+                href={item.href}
+                className="shrink-0 rounded-2xl bg-neutral-900 hover:bg-orange-600 border border-neutral-800 hover:border-orange-500 px-5 py-3 text-sm font-black text-neutral-300 hover:text-white transition-all active:scale-95 mx-auto"
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+        </nav>
       <section className="max-w-6xl mx-auto space-y-6">
         <AppNavbar
           title="Panel Admin"
           role="admin"
         />
 
-        <div className="relative overflow-hidden rounded-[2rem] border border-neutral-800 bg-neutral-900 p-5 md:p-8 shadow-2xl">
+        <div id="resumen" className="scroll-mt-24 relative overflow-hidden rounded-[2rem] border border-neutral-800 bg-neutral-900 p-5 md:p-8 shadow-2xl">
           <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-600/20 blur-3xl" />
           <div className="absolute -bottom-20 left-10 h-44 w-44 rounded-full bg-red-900/20 blur-3xl" />
 
@@ -516,11 +710,12 @@ export default function AdminPage() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="group relative overflow-hidden bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-xl hover:border-orange-500/40 transition-all">
-            <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
+          <div className="group relative overflow-hidden bg-gradient-to-br from-neutral-950 to-neutral-900 border border-neutral-800 rounded-[2rem] p-6 shadow-2xl hover:scale-[1.02] hover:border-orange-500/40 transition-all duration-300">
+          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-600/20 blur-3xl" />
+            <p className="text-orange-400 text-m font-semibold uppercase tracking-[0.2em]">
               Casas activas
             </p>
-            <p className="text-4xl font-black mt-3 text-green-400">
+            <p className="text-5xl font-black mt-2 text-green-300">
               {activeHousesCount}
             </p>
             <p className="text-neutral-500 text-sm mt-2">
@@ -528,11 +723,12 @@ export default function AdminPage() {
             </p>
           </div>
 
-          <div className="group relative overflow-hidden bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-xl hover:border-orange-500/40 transition-all">
-            <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
+          <div className="group relative overflow-hidden bg-gradient-to-br from-neutral-950 to-neutral-900 border border-neutral-800 rounded-[2rem] p-6 shadow-2xl hover:scale-[1.02] hover:border-orange-500/40 transition-all duration-300">
+          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-600/20 blur-3xl" />
+            <p className="text-orange-400 text-m font-semibold uppercase tracking-[0.2em]">
               Visitas activas
             </p>
-            <p className="text-4xl font-black mt-3 text-orange-400">
+            <p className="text-5xl font-black mt-2 text-orange-300">
               {activeVisitsCount}
             </p>
             <p className="text-neutral-500 text-sm mt-2">
@@ -540,11 +736,12 @@ export default function AdminPage() {
             </p>
           </div>
 
-          <div className="group relative overflow-hidden bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-xl hover:border-orange-500/40 transition-all">
-            <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
+          <div className="group relative overflow-hidden bg-gradient-to-br from-neutral-950 to-neutral-900 border border-neutral-800 rounded-[2rem] p-6 shadow-2xl hover:scale-[1.02] hover:border-orange-500/40 transition-all duration-300">
+          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-600/20 blur-3xl" />
+            <p className="text-orange-400 text-m font-semibold uppercase tracking-[0.2em]">
               QR vencidos
             </p>
-            <p className="text-4xl font-black mt-3 text-yellow-400">
+            <p className="text-5xl font-black mt-2 text-yellow-300">
               {expiredVisitsCount}
             </p>
             <p className="text-neutral-500 text-sm mt-2">
@@ -552,11 +749,12 @@ export default function AdminPage() {
             </p>
           </div>
 
-          <div className="group relative overflow-hidden bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-xl hover:border-orange-500/40 transition-all">
-            <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
+          <div className="group relative overflow-hidden bg-gradient-to-br from-neutral-950 to-neutral-900 border border-neutral-800 rounded-[2rem] p-6 shadow-2xl hover:scale-[1.02] hover:border-orange-500/40 transition-all duration-300">
+          <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-600/20 blur-3xl" />
+            <p className="text-orange-400 text-sm font-semibold uppercase tracking-[0.2em]">
               Accesos registrados
             </p>
-            <p className="text-4xl font-black mt-3 text-sky-400">
+            <p className="text-5xl font-black mt-3 text-sky-300">
               {totalAccessLogsCount}
             </p>
             <p className="text-neutral-500 text-sm mt-2">
@@ -565,12 +763,14 @@ export default function AdminPage() {
           </div>
 
           <div className="group relative overflow-hidden bg-neutral-900 border border-neutral-800 rounded-2xl p-5 shadow-xl hover:border-orange-500/40 transition-all md:col-span-4">
+            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-orange-600/20 blur-3xl" />
+            <div className="absolute -bottom-20 left-10 h-44 w-44 rounded-full bg-red-900/20 blur-3xl" />
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
+                <p className="text-orange-400 text-m font-semibold uppercase tracking-[0.2em]">
                   Dispositivos residentes
                 </p>
-                <p className="text-4xl font-black mt-3 text-purple-300">
+                <p className="text-5xl font-black mt-3 text-purple-300">
                   {devices.length}
                 </p>
                 <p className="text-neutral-500 text-sm mt-2">
@@ -579,24 +779,25 @@ export default function AdminPage() {
               </div>
 
               <div className="rounded-2xl border border-purple-700 bg-purple-950 px-5 py-4 text-purple-200 font-black">
-                Máximo 3 activos por casa
+                Máximo {settingsMaxDevices} activos por casa
               </div>
             </div>
           </div>
         </div>
-
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-4 md:p-5">
+        
+        <div id="analytics" className="group relative overflow-hidden scroll-mt-24 bg-neutral-900 border border-neutral-800 rounded-2xl p-4 md:p-5 shadow-xl hover:border-orange-500/40 transition-all md:col-span-4">
+        <div className="absolute -right-40 -bottom-35 h-75 w-180 rounded-full bg-orange-600/20 blur-3xl" />
+        <div className="absolute -left-40 -top-35 h-75 w-180 rounded-full bg-neutral-950/60 blur-3xl" />
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             <div>
-              <p className="text-orange-400 font-semibold tracking-[0.25em] uppercase text-sm">
+              <p className="group relative text-orange-400 font-semibold tracking-[0.25em] uppercase text-sm">
                 Analytics
               </p>
-              <h2 className="text-2xl font-black mt-1">Actividad de hoy</h2>
-              <p className="text-neutral-400 text-sm mt-1">
+              <h2 className="group relative text-2xl font-black mt-1">Actividad de hoy</h2>
+              <p className="group relative text-neutral-400 text-sm mt-1">
                 Resumen operativo de accesos registrados por caseta durante el día.
               </p>
             </div>
-
             <div className="bg-neutral-800 border border-neutral-700 rounded-2xl px-5 py-4 text-center">
               <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
                 Aprobación
@@ -607,7 +808,7 @@ export default function AdminPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="group relative grid overflow-hidden grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-neutral-800 border border-neutral-700 rounded-2xl p-4">
               <p className="text-neutral-400 text-sm font-semibold uppercase tracking-[0.2em]">
                 Accesos hoy
@@ -620,7 +821,7 @@ export default function AdminPage() {
               </p>
             </div>
 
-            <div className="bg-green-950 border border-green-800 rounded-2xl p-4">
+            <div className="group relative bg-green-950 border border-green-800 rounded-2xl p-4">
               <p className="text-green-300 text-sm font-semibold uppercase tracking-[0.2em]">
                 Aprobados
               </p>
@@ -632,7 +833,7 @@ export default function AdminPage() {
               </p>
             </div>
 
-            <div className="bg-red-950 border border-red-800 rounded-2xl p-4">
+            <div className="group relative bg-red-950 border border-red-800 rounded-2xl p-4">
               <p className="text-red-300 text-sm font-semibold uppercase tracking-[0.2em]">
                 Rechazados
               </p>
@@ -646,7 +847,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="bg-neutral-900 rounded-2xl p-5 space-y-3">
+        <div id="crear-casa" className="scroll-mt-24 bg-neutral-900 rounded-2xl p-5 space-y-3">
           <h2 className="text-xl font-bold">Agregar casa</h2>
 
           <input
@@ -678,7 +879,7 @@ export default function AdminPage() {
           </button>
         </div>
 
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-5">
+        <div id="crear-usuario" className="scroll-mt-24 bg-neutral-900 border border-neutral-800 rounded-2xl p-5 space-y-5">
           <div>
             <p className="text-orange-400 font-semibold tracking-[0.25em] uppercase text-sm">
               Usuarios
@@ -758,7 +959,7 @@ export default function AdminPage() {
           </button>
         </div>
 
-        <div className="bg-neutral-900 rounded-2xl p-5">
+        <div id="usuarios" className="scroll-mt-24 bg-neutral-900 rounded-2xl p-5">
           <div className="mb-6">
             <p className="text-orange-400 font-semibold tracking-[0.25em] uppercase text-sm">
               Administración
@@ -911,7 +1112,7 @@ export default function AdminPage() {
           )}
         </div>
 
-        <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-5">
+        <div id="dispositivos" className="scroll-mt-24 bg-neutral-900 border border-neutral-800 rounded-2xl p-5">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             <div>
               <p className="text-orange-400 font-semibold tracking-[0.25em] uppercase text-sm">
@@ -919,7 +1120,7 @@ export default function AdminPage() {
               </p>
               <h2 className="text-xl font-bold mt-1">Dispositivos autorizados</h2>
               <p className="text-neutral-400 text-sm mt-1">
-                Administra los dispositivos vinculados a residentes. Puedes desactivar un equipo para liberar espacio dentro del límite de 3 dispositivos por casa.
+                Administra los dispositivos vinculados a residentes. Puedes desactivar un equipo para liberar espacio dentro del límite configurado de {settingsMaxDevices} dispositivos por casa.
               </p>
             </div>
 
@@ -1020,7 +1221,7 @@ export default function AdminPage() {
           )}
         </div>
 
-        <div className="bg-neutral-900 rounded-2xl p-5">
+        <div id="casas" className="scroll-mt-24 bg-neutral-900 rounded-2xl p-5">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
             <div>
               <h2 className="text-xl font-bold">Casas registradas</h2>
@@ -1139,7 +1340,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="bg-neutral-900 rounded-2xl p-5">
+        <div id="visitas" className="scroll-mt-24 bg-neutral-900 rounded-2xl p-5">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
             <div>
               <h2 className="text-xl font-bold">Visitas generadas</h2>
@@ -1207,7 +1408,7 @@ export default function AdminPage() {
           </div>
         </div>
 
-        <div className="bg-neutral-900 rounded-2xl p-5 border border-neutral-800 shadow-2xl">
+        <div id="historial" className="scroll-mt-24 bg-neutral-900 rounded-2xl p-5 border border-neutral-800 shadow-2xl">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
             <div>
               <p className="text-orange-400 font-semibold tracking-[0.25em] uppercase text-sm">
@@ -1279,6 +1480,106 @@ export default function AdminPage() {
               </div>
             )}
           </div>
+        </div>
+
+        <div id="configuracion" className="scroll-mt-24 bg-neutral-900 border border-neutral-800 rounded-[2rem] p-5 md:p-6 shadow-2xl space-y-5">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <p className="text-orange-400 font-semibold tracking-[0.25em] uppercase text-sm">
+                Sistema
+              </p>
+              <h2 className="text-2xl md:text-3xl font-black mt-1">Configuración general</h2>
+              <p className="text-neutral-400 text-sm mt-2">
+                Ajusta los valores principales de operación sin modificar el código del sistema. Para guardar cambios se requiere contraseña autorizada.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-orange-500/30 bg-orange-500/10 px-5 py-4 text-left md:text-right">
+              <p className="text-xs font-black uppercase tracking-[0.25em] text-orange-300">
+                Versión
+              </p>
+              <p className="mt-2 text-2xl font-black text-white">1.0</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">
+                Nombre del sistema
+              </label>
+              <input
+                value={settingsSystemName}
+                onChange={(e) => setSettingsSystemName(e.target.value)}
+                placeholder="JMSR Access"
+                className="w-full bg-neutral-800 border border-neutral-700 rounded-2xl px-4 py-3 outline-none focus:border-orange-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">
+                Nombre del fraccionamiento
+              </label>
+              <input
+                value={settingsNeighborhoodName}
+                onChange={(e) => setSettingsNeighborhoodName(e.target.value)}
+                placeholder="Fraccionamiento José María Sánchez Ramírez"
+                className="w-full bg-neutral-800 border border-neutral-700 rounded-2xl px-4 py-3 outline-none focus:border-orange-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">
+                Máximo de dispositivos por casa
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={settingsMaxDevices}
+                onChange={(e) => setSettingsMaxDevices(e.target.value)}
+                className="w-full bg-neutral-800 border border-neutral-700 rounded-2xl px-4 py-3 outline-none focus:border-orange-500"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">
+                Máximo de QR activos por casa
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={settingsMaxActiveQr}
+                onChange={(e) => setSettingsMaxActiveQr(e.target.value)}
+                className="w-full bg-neutral-800 border border-neutral-700 rounded-2xl px-4 py-3 outline-none focus:border-orange-500"
+              />
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-xs font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">
+                Vigencia del QR en horas
+              </label>
+              <input
+                type="number"
+                min="1"
+                value={settingsQrExpirationHours}
+                onChange={(e) => setSettingsQrExpirationHours(e.target.value)}
+                className="w-full bg-neutral-800 border border-neutral-700 rounded-2xl px-4 py-3 outline-none focus:border-orange-500"
+              />
+            </div>
+          </div>
+
+          {settingsMessage && (
+            <div className="rounded-2xl border border-neutral-700 bg-neutral-800 px-4 py-3 text-sm font-semibold text-neutral-200">
+              {settingsMessage}
+            </div>
+          )}
+
+          <button
+            onClick={saveSettings}
+            disabled={isSavingSettings}
+            className="w-full bg-orange-600 hover:bg-orange-500 disabled:opacity-50 disabled:cursor-not-allowed rounded-2xl py-4 font-black transition-all active:scale-95"
+          >
+            {isSavingSettings ? "Guardando configuración..." : "Guardar configuración"}
+          </button>
         </div>
       </section>
     </main>
