@@ -142,6 +142,11 @@ export default function ResidentePage() {
     context.fillText("Presenta este código en caseta para validar el acceso.", canvas.width / 2, 1045);
     context.font = "18px Arial";
     context.fillText("El visitante deberá identificarse en caseta.", canvas.width / 2, 1085);
+    context.font = "12px Arial";
+    context.fillText("JSMR Access v1.0", canvas.width / 2, 1125);
+    context.fillText("Sistema de Control de Acceso Residencial", canvas.width / 2, 1140);
+    context.fillText("Desarrollado por Kriger", canvas.width / 2, 1155);
+    context.fillText("© 2026 JSMR Access. Todos los derechos reservados.", canvas.width / 2, 1170);
 
     URL.revokeObjectURL(svgUrl);
 
